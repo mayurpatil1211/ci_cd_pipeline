@@ -4,6 +4,9 @@ FROM python:3.12-slim
 # Set working directory inside container
 WORKDIR /app
  
+# Create non-root user
+RUN useradd -m appuser
+
 # Copy requirements first (layer caching — only reinstalls if requirements change)
 COPY requirements.txt .
  
@@ -15,6 +18,9 @@ COPY app.py .
  
 # Expose port
 EXPOSE 5000
+
+
+USER appuser
  
 # Run the app
 CMD ["python", "app.py"]
