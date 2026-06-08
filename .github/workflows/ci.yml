@@ -23,7 +23,7 @@ jobs:
                 password: ${{ secrets.DOCKERHUB_TOKEN }}
 
           - name: Build Docker image
-            run: docker build -t mayurpatil1211/myapp:${{ github.sha }} .
+            run: docker build -t mayurpatil1211/ci_cd_pipeline:${{ github.sha }} .
 
           - name: Push to Docker Hub
-            run: docker push mayurpatil1211/myapp:${{ github.sha }}
+            run: docker push mayurpatil1211/ci_cd_pipeline:${{ github.sha }}
