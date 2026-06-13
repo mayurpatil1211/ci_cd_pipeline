@@ -1,2 +1,2 @@
 flask==3.1.0
-pytest
+gunicorn==22.0.0

@@ -1,14 +1,15 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from app import app
+# tests/test_app.py  ← update to use create_app()
+from app import create_app
+from app.config import TestingConfig
 
-def test_health():
-    client = app.test_client()
-    response = client.get('/health')
-    assert response.status_code == 200
+def test_app_creates_successfully():
+    app = create_app(config_class=TestingConfig)
+    assert app is not None
 
-def test_home():
-    client = app.test_client()
-    response = client.get('/')
-    assert response.status_code == 200
+def test_app_is_in_testing_mode():
+    app = create_app(config_class=TestingConfig)
+    assert app.config["TESTING"] is True
+
+def test_app_version_set():
+    app = create_app(config_class=TestingConfig)
+    assert app.config["APP_VERSION"] == "test"

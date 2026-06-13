@@ -27,3 +27,6 @@ jobs:
 
           - name: Push to Docker Hub
             run: docker push mayurpatil1211/ci_cd_pipeline:${{ github.sha }}
+
+          - name: Deploy to Kubernetes
+            run: kubectl set image deployment/myapp myapp=mayurpatil1211/ci_cd_pipeline:${{ github.sha }}
