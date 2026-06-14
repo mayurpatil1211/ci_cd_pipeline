@@ -1,0 +1,11 @@
+# kubernetes/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myapp-config
+  labels:
+    app: myapp
+data:
+  APP_VERSION: "v1"
+  FLASK_ENV: "production"
+  LOG_LEVEL: "INFO"
