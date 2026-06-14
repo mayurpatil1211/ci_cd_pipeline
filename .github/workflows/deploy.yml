@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-    # ← add this for manual dispatch
     inputs:
       environment:
         description: 'Target environment'
@@ -20,6 +19,7 @@ on:
 jobs:
   test:
     runs-on: self-hosted
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -28,16 +28,17 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-        cache: "pip"
+        # no cache: "pip" — using actions/cache below instead
 
     - name: Cache pip dependencies
       id: pip-cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: pip-${{ matrix.python-version }}-${{ hashFiles('requirements*.txt') }}
+        key: pip-3.12-${{ hashFiles('requirements*.txt') }}
+        # ↑ fixed: hardcoded 3.12, no matrix variable
         restore-keys: |
-          pip-${{ matrix.python-version }}-
+          pip-3.12-
 
     - name: Install dependencies
       run: pip install -r requirements-dev.txt
@@ -59,17 +60,32 @@ jobs:
   deploy:
     runs-on: self-hosted
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # ↑ fixed: added workflow_dispatch to condition
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      github.event_name == 'workflow_dispatch'
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Show deployment target
+    - name: Set target namespace
+      # ↑ fixed: this step was missing entirely
       run: |
-        echo "Deploying to: ${{ github.event.inputs.environment || 'staging' }}"
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          NAMESPACE="${{ github.event.inputs.environment }}"
+        else
+          NAMESPACE="staging"
+        fi
+        echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV
+        echo "Target namespace: $NAMESPACE"
+
+    - name: Show deployment info
+      run: |
+        echo "Namespace   : $NAMESPACE"
         echo "Triggered by: ${{ github.event_name }}"
-        echo "Commit: ${{ github.sha }}"
+        echo "Commit      : ${{ github.sha }}"
+        echo "Actor       : ${{ github.actor }}"
 
     - name: Set image tag
       run: echo "IMAGE_TAG=myapp:${{ github.sha }}" >> $GITHUB_ENV
@@ -88,22 +104,32 @@ jobs:
       run: |
         sed -i "s|image: myapp:.*|image: $IMAGE_TAG|g" kubernetes/deployment.yaml
 
-    - name: Apply Service # applied first — stable, rarely changes
-      run: |
-        kubectl apply -f kubernetes/service.yaml
+    - name: Ensure namespaces exist
+      # ↑ fixed: namespaces must exist before applying to them
+      run: kubectl apply -f kubernetes/namespaces.yaml
 
-    - name: Apply Deployment # applied second — changes on every deploy
+    - name: Apply ConfigMap
+      run: kubectl apply -f kubernetes/configmap.yaml -n $NAMESPACE
+
+    - name: Apply Service
+      # ↑ fixed: added -n $NAMESPACE
+      run: kubectl apply -f kubernetes/service.yaml -n $NAMESPACE
+
+    - name: Apply Deployment
+      # ↑ fixed: added -n $NAMESPACE
       run: |
-        kubectl apply -f kubernetes/deployment.yaml
-        kubectl rollout status deployment/myapp --timeout=120s
+        kubectl apply -f kubernetes/deployment.yaml -n $NAMESPACE
+        kubectl rollout status deployment/myapp -n $NAMESPACE --timeout=120s
 
     - name: Smoke test
       run: |
         MINIKUBE_IP=$(minikube ip)
-        NODE_PORT=$(kubectl get svc myapp-svc -o jsonpath='{.spec.ports[0].nodePort}')
+        NODE_PORT=$(kubectl get svc myapp-svc -n $NAMESPACE \
+          -o jsonpath='{.spec.ports[0].nodePort}')
         curl -f http://$MINIKUBE_IP:$NODE_PORT/health
-        echo "Smoke test passed!"
+        echo "Smoke test passed on $NAMESPACE!"
 
     - name: Rollback on failure
       if: failure()
-      run: kubectl rollout undo deployment/myapp
+      # ↑ fixed: added -n $NAMESPACE
+      run: kubectl rollout undo deployment/myapp -n $NAMESPACE
