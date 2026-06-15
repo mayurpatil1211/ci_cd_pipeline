@@ -6,6 +6,6 @@ metadata:
   labels:
     app: myapp
 data:
-  APP_VERSION: "v1"
+  APP_VERSION: "v2"
   FLASK_ENV: "production"
   LOG_LEVEL: "INFO"
