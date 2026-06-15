@@ -121,19 +121,19 @@ jobs:
         sed -i "s|image: myapp:IMAGE_TAG|image: myapp:${{ github.sha }}|g" \
           kubernetes/deployment.yaml
 
-        kubectl apply -f kubernetes/deployment.yaml
+        kubectl apply -f kubernetes/deployment.yaml -n $NAMESPACE
 
         # This BLOCKS until rollout is complete (or times out)
         # If any pod fails readiness probe, this exits non-zero
         # which triggers the rollback step below
-        kubectl rollout status deployment/myapp --timeout=180s
+        kubectl rollout status deployment/myapp --timeout=180s  -n $NAMESPACE
 
     - name: Rollback if failed
       if: failure()
       run: |
         echo "Rolling update failed — rolling back"
-        kubectl rollout undo deployment/myapp
-        kubectl rollout status deployment/myapp --timeout=60s
+        kubectl rollout undo deployment/myapp  -n $NAMESPACE
+        kubectl rollout status deployment/myapp --timeout=60s  -n $NAMESPACE
 
     - name: Smoke test
       run: |
