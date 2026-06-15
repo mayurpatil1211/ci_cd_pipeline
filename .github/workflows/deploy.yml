@@ -133,3 +133,20 @@ jobs:
       if: failure()
       # ↑ fixed: added -n $NAMESPACE
       run: kubectl rollout undo deployment/myapp -n $NAMESPACE
+
+    - name: Generate deployment summary
+      if: always()
+      run: |
+        # Write to GitHub Actions job summary (appears in UI)
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        ## Deployment Summary
+
+        | Property | Value |
+        |---|---|
+        | Status | ${{ job.status }} |
+        | Image | myapp:${{ github.sha }} |
+        | Commit | ${{ github.sha }} |
+        | Branch | ${{ github.ref_name }} |
+        | Triggered by | ${{ github.actor }} |
+        | Run number | ${{ github.run_number }} |
+        EOF
