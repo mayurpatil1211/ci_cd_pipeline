@@ -115,11 +115,25 @@ jobs:
       # ↑ fixed: added -n $NAMESPACE
       run: kubectl apply -f kubernetes/service.yaml -n $NAMESPACE
 
-    - name: Apply Deployment
-      # ↑ fixed: added -n $NAMESPACE
+    - name: Rolling deploy
       run: |
-        kubectl apply -f kubernetes/deployment.yaml -n $NAMESPACE
-        kubectl rollout status deployment/myapp -n $NAMESPACE --timeout=120s
+        # Replace IMAGE_TAG placeholder in manifest
+        sed -i "s|image: myapp:IMAGE_TAG|image: myapp:${{ github.sha }}|g" \
+          kubernetes/deployment.yaml
+
+        kubectl apply -f kubernetes/deployment.yaml
+
+        # This BLOCKS until rollout is complete (or times out)
+        # If any pod fails readiness probe, this exits non-zero
+        # which triggers the rollback step below
+        kubectl rollout status deployment/myapp --timeout=180s
+
+    - name: Rollback if failed
+      if: failure()
+      run: |
+        echo "Rolling update failed — rolling back"
+        kubectl rollout undo deployment/myapp
+        kubectl rollout status deployment/myapp --timeout=60s
 
     - name: Smoke test
       run: |
@@ -128,11 +142,6 @@ jobs:
           -o jsonpath='{.spec.ports[0].nodePort}')
         curl -f http://$MINIKUBE_IP:$NODE_PORT/health
         echo "Smoke test passed on $NAMESPACE!"
-
-    - name: Rollback on failure
-      if: failure()
-      # ↑ fixed: added -n $NAMESPACE
-      run: kubectl rollout undo deployment/myapp -n $NAMESPACE
 
     - name: Generate deployment summary
       if: always()
